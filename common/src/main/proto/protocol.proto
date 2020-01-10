@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package ru.ifmo.java.benchmark.protocol;
+
+message Request {
+    oneof request {
+        SortArrayRequest sortArrayRequest = 1;
+    }
+}
+
+message Response {
+    oneof response {
+        SortArrayResponse sortArrayResponse = 1;
+    }
+    float processTimeRequest = 2;
+    float processTimeClient = 3;
+}
+
+message SortArrayRequest {
+    Array data = 1;
+}
+
+message SortArrayResponse {
+    Array data = 1;
+}
+
+message Array {
+    repeated int32 item = 1;
+}
