@@ -15,15 +15,19 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class NonBlockingServer extends Server {
     final private ServerSocketChannel serverSocketChannel;
     final private Selector inputSelector = Selector.open();
     final private Selector outputSelector = Selector.open();
-
     final private ExecutorService inputSelectorExecutor = Executors.newSingleThreadExecutor();
     final private ExecutorService outputSelectorExecutor = Executors.newSingleThreadExecutor();
     final private ExecutorService workingPool;
+
+    Lock inputSelectorLock = new ReentrantLock();
+    Lock outputSelectorLock = new ReentrantLock();
 
     public NonBlockingServer(String serverHost, int serverPort, int threads) throws IOException {
         super(serverHost, serverPort);
@@ -47,7 +51,13 @@ public class NonBlockingServer extends Server {
 
                 connections.add(socketChannel);
                 socketChannel.configureBlocking(false);
-                socketChannel.register(inputSelector, SelectionKey.OP_READ, new ChannelInputContext());
+                inputSelectorLock.lock();
+                try {
+                    inputSelector.wakeup();
+                    socketChannel.register(inputSelector, SelectionKey.OP_READ, new ChannelInputContext());
+                } finally {
+                    inputSelectorLock.unlock();
+                }
             }
         } catch (IOException | ClosedSelectorException ignored) {
         } finally {
@@ -73,7 +83,9 @@ public class NonBlockingServer extends Server {
     private void inputSelectorReader() {
         try {
             while (!Thread.interrupted()) {
-                if (inputSelector.selectNow() == 0) {
+                inputSelectorLock.lock();
+                inputSelectorLock.unlock();
+                if (inputSelector.select() == 0) {
                     continue;
                 }
 
@@ -103,7 +115,13 @@ public class NonBlockingServer extends Server {
                                         processClientRequest(clientContext);
                                         ChannelOutputContext channelOutputContext = new ChannelOutputContext();
                                         channelOutputContext.processedClientContext.set(clientContext);
-                                        channel.register(outputSelector, SelectionKey.OP_WRITE, channelOutputContext);
+                                        outputSelectorLock.lock();
+                                        try {
+                                            outputSelector.wakeup();
+                                            channel.register(outputSelector, SelectionKey.OP_WRITE, channelOutputContext);
+                                        } finally {
+                                            outputSelectorLock.unlock();
+                                        }
                                     } catch (ClosedChannelException ignored) {
                                     }
                                 }, workingPool);
@@ -123,7 +141,9 @@ public class NonBlockingServer extends Server {
     private void outputSelectorWriter() {
         try {
             while (!Thread.interrupted()) {
-                if (outputSelector.selectNow() == 0) {
+                outputSelectorLock.lock();
+                outputSelectorLock.unlock();
+                if (outputSelector.select() == 0) {
                     continue;
                 }
 
