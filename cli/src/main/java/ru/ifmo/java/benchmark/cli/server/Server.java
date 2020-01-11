@@ -12,14 +12,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class Server {
-    public static final String DEFAULT_HOST = "localhost";
-    public static final int DEFAULT_NAIVE_BLOCKING_PORT = 12345;
-    public static final int DEFAULT_BLOCKING_PORT = 12346;
-    public static final int DEFAULT_ASYNC_PORT = 12347;
-    public static final int DEFAULT_NON_BLOCKING_PORT = 12348;
-    public static final int DEFAULT_THREADS_NUMBER = 4;
+import static ru.ifmo.java.benchmark.Benchmark.*;
 
+public class Server {
     public static void main(String[] args) {
         Options options = new Options();
         options.addOption(null, "host", true, "Host");
@@ -39,7 +34,7 @@ public class Server {
             int asyncPort = Integer.parseInt(cmd.getOptionValue("async", String.valueOf(DEFAULT_ASYNC_PORT)));
             int nonBlockingPort = Integer.parseInt(cmd.getOptionValue("non-blocking", String.valueOf(DEFAULT_NON_BLOCKING_PORT)));
 
-            int threadsNumber = Integer.parseInt(cmd.getOptionValue("threads", String.valueOf(DEFAULT_THREADS_NUMBER)));
+            int threadsNumber = Integer.parseInt(cmd.getOptionValue("threads", String.valueOf(4)));
 
             String host = cmd.getOptionValue("host", DEFAULT_HOST);
 

@@ -3,6 +3,7 @@ package ru.ifmo.java.benchmark.server;
 import ru.ifmo.java.benchmark.protocol.Protocol;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 public abstract class Server {
     protected final int serverPort;
@@ -37,7 +38,25 @@ public abstract class Server {
     }
 
     static protected Protocol.SortArrayResponse processSortArrayRequest(Protocol.SortArrayRequest request) {
-        return Protocol.SortArrayResponse.newBuilder().setData(request.getData()).build();
+        ArrayList<Integer> arrayList = new ArrayList<>(request.getData().getItemList());
+
+        // Gnome sort
+        {
+            int i = 1;
+            int tmp;
+            while (i < arrayList.size()) {
+                if (i == 0 || arrayList.get(i - 1) <= arrayList.get(i)) {
+                    i++;
+                } else {
+                    tmp = arrayList.get(i);
+                    arrayList.set(i, arrayList.get(i - 1));
+                    arrayList.set(i - 1, tmp);
+                    i--;
+                }
+            }
+        }
+
+        return Protocol.SortArrayResponse.newBuilder().setData(Protocol.Array.newBuilder().addAllItem(arrayList).build()).build();
     }
 
     public abstract void run();

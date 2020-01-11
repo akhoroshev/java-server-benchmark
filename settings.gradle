@@ -1,3 +1,5 @@
 rootProject.name = 'benchmark'
 include 'common'
 include 'cli'
+include 'gui'
+

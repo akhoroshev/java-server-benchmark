@@ -88,9 +88,9 @@ public class ClientServerInteractionTest {
         for (int i = 0; i < 10; i++) {
             Client client = makeClient();
             clients.add(client);
-            List<Integer> in = makeRandomArray(1000000);
+            List<Integer> in = makeRandomArray(1000);
             completableFutures.add(client.sortArray(in).thenAcceptAsync(listResponse -> {
-//                Collections.sort(in);
+                Collections.sort(in);
                 Assert.assertEquals(in.size(), listResponse.getBody().size());
                 Assert.assertEquals(in, listResponse.getBody());
             }));

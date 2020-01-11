@@ -17,6 +17,7 @@ subprojects {
     }
 
     dependencies {
+        implementation("org.apache.commons", "commons-lang3", "3.2")
         implementation("commons-io", "commons-io", "2.6")
         implementation("commons-cli", "commons-cli", "1.4")
         implementation("com.google.protobuf:protobuf-java:3.10.0")
