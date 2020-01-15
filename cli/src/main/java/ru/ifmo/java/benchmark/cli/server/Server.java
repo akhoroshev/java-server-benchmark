@@ -24,7 +24,6 @@ public class Server {
         options.addOption(null, "non-blocking", true, "Port for nonblocking server");
         options.addOption(null, "threads", true, "Number of threads");
 
-
         try {
             CommandLineParser parser = new DefaultParser();
             CommandLine cmd = parser.parse(options, args, false);

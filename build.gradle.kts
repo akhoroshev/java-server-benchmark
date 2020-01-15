@@ -22,6 +22,7 @@ subprojects {
         implementation("commons-cli", "commons-cli", "1.4")
         implementation("com.google.protobuf:protobuf-java:3.10.0")
         implementation("org.jetbrains", "annotations", "17.0.0")
+        implementation("org.jfree", "jfreechart", "1.5.0")
         testImplementation("junit", "junit", "4.12")
     }
 

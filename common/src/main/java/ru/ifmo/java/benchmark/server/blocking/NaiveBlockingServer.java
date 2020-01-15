@@ -20,7 +20,7 @@ public class NaiveBlockingServer extends Server {
     final private ExecutorService pool = Executors.newCachedThreadPool();
 
     public NaiveBlockingServer(String serverHost, int serverPort) throws IOException {
-        super(serverHost, serverPort);
+        super(ServerType.NAIVE_BLOCKING, serverHost, serverPort);
         serverSocket = new ServerSocket(serverPort);
     }
 
@@ -50,7 +50,7 @@ public class NaiveBlockingServer extends Server {
         serverSocket.close();
     }
 
-    private static class Worker implements Runnable {
+    private class Worker implements Runnable {
         final InputStream inputStream;
         final OutputStream outputStream;
         final Socket socket;

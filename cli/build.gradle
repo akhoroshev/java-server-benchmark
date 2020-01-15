@@ -1,0 +1,10 @@
+apply plugin: 'application'
+mainClassName = 'ru.ifmo.java.benchmark.cli.server.Server'
+
+dependencies {
+    implementation(project(":common"))
+}
+
+run {
+    standardInput = System.in
+}

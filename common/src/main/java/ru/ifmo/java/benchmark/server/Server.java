@@ -1,40 +1,46 @@
 package ru.ifmo.java.benchmark.server;
 
 import ru.ifmo.java.benchmark.protocol.Protocol;
+import ru.ifmo.java.benchmark.server.async.AsyncServer;
+import ru.ifmo.java.benchmark.server.blocking.BlockingServer;
+import ru.ifmo.java.benchmark.server.blocking.NaiveBlockingServer;
+import ru.ifmo.java.benchmark.server.nonblocking.NonBlockingServer;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public abstract class Server {
+    protected final ServerType serverType;
     protected final int serverPort;
     protected final String serverHost;
 
-    protected Server(String serverHost, int serverPort) {
+    protected final Logger logger;
+
+    protected Server(ServerType serverType, String serverHost, int serverPort) {
+        this.serverType = serverType;
         this.serverPort = serverPort;
         this.serverHost = serverHost;
+        logger = Logger.getLogger(serverType.toString());
     }
 
-    static protected ClientContext beginProcessClient(Protocol.Request request) {
-        ClientContext clientContext = new ClientContext(request);
-        clientContext.contextProcessBeginTime = System.nanoTime();
-        return clientContext;
-    }
-
-    static protected void processClientRequest(ClientContext clientContext) {
-        clientContext.requestProcessBeginTime = System.nanoTime();
-        if (clientContext.request.hasSortArrayRequest()) {
-            clientContext.responseBuilder.setSortArrayResponse(processSortArrayRequest(clientContext.request.getSortArrayRequest()));
-        } else {
-            throw new IllegalStateException("Unexpected request type");
+    static public Server create(String serverHost, int serverPort, int threads, ServerType type) throws IOException {
+        switch (type) {
+            case NAIVE_BLOCKING:
+                return new NaiveBlockingServer(serverHost, serverPort);
+            case BLOCKING:
+                return new BlockingServer(serverHost, serverPort, threads);
+            case NON_BLOCKING:
+                return new NonBlockingServer(serverHost, serverPort, threads);
+            case ASYNC:
+                return new AsyncServer(serverHost, serverPort, threads);
         }
-        clientContext.requestProcessEndTime = System.nanoTime();
+        return null;
     }
 
-    static protected Protocol.Response endProcessClient(ClientContext clientContext) {
-        clientContext.contextProcessEndTime = System.nanoTime();
-        clientContext.responseBuilder.setProcessTimeClient((clientContext.contextProcessEndTime - clientContext.contextProcessBeginTime) / 1000000.f);
-        clientContext.responseBuilder.setProcessTimeRequest((clientContext.requestProcessEndTime - clientContext.requestProcessBeginTime) / 1000000.f);
-        return clientContext.responseBuilder.build();
+    static public Server create(String serverHost, int serverPort, ServerType type) throws IOException {
+        return create(serverHost, serverPort, 4, type);
     }
 
     static protected Protocol.SortArrayResponse processSortArrayRequest(Protocol.SortArrayRequest request) {
@@ -59,9 +65,43 @@ public abstract class Server {
         return Protocol.SortArrayResponse.newBuilder().setData(Protocol.Array.newBuilder().addAllItem(arrayList).build()).build();
     }
 
+    protected ClientContext beginProcessClient(Protocol.Request request) {
+        ClientContext clientContext = new ClientContext(request);
+        clientContext.contextProcessBeginTime = System.nanoTime();
+        logger.log(Level.INFO, "ClientContext created " + clientContext.hashCode());
+        return clientContext;
+    }
+
+    protected void processClientRequest(ClientContext clientContext) {
+        logger.log(Level.INFO, "Begin process request " + clientContext.hashCode());
+        clientContext.requestProcessBeginTime = System.nanoTime();
+        if (clientContext.request.hasSortArrayRequest()) {
+            clientContext.responseBuilder.setSortArrayResponse(processSortArrayRequest(clientContext.request.getSortArrayRequest()));
+        } else {
+            throw new IllegalStateException("Unexpected request type");
+        }
+        clientContext.requestProcessEndTime = System.nanoTime();
+        logger.log(Level.INFO, "End process request " + clientContext.hashCode());
+    }
+
+    protected Protocol.Response endProcessClient(ClientContext clientContext) {
+        logger.log(Level.INFO, "End process client " + clientContext.hashCode());
+        clientContext.contextProcessEndTime = System.nanoTime();
+        clientContext.responseBuilder.setProcessTimeClient((clientContext.contextProcessEndTime - clientContext.contextProcessBeginTime) / 1000000.f);
+        clientContext.responseBuilder.setProcessTimeRequest((clientContext.requestProcessEndTime - clientContext.requestProcessBeginTime) / 1000000.f);
+        return clientContext.responseBuilder.build();
+    }
+
     public abstract void run();
 
     public abstract void close() throws IOException;
+
+    public enum ServerType {
+        NAIVE_BLOCKING,
+        BLOCKING,
+        NON_BLOCKING,
+        ASYNC
+    }
 
     protected static class ClientContext {
         final Protocol.Response.Builder responseBuilder;

@@ -19,7 +19,7 @@ public class BlockingServer extends Server {
     final private ExecutorService workingPool;
 
     public BlockingServer(String serverHost, int serverPort, int threads) throws IOException {
-        super(serverHost, serverPort);
+        super(ServerType.BLOCKING, serverHost, serverPort);
         serverSocket = new ServerSocket(serverPort);
         workingPool = Executors.newFixedThreadPool(threads);
     }

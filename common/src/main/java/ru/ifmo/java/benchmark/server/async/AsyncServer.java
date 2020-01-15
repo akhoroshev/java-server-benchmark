@@ -18,7 +18,7 @@ public class AsyncServer extends Server {
     AsynchronousServerSocketChannel asynchronousServerSocketChannel;
 
     public AsyncServer(String serverHost, int serverPort, int threads) throws IOException {
-        super(serverHost, serverPort);
+        super(ServerType.ASYNC, serverHost, serverPort);
         asynchronousServerSocketChannel = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(serverHost, serverPort));
         workingPool = Executors.newFixedThreadPool(threads);
     }
@@ -95,6 +95,7 @@ public class AsyncServer extends Server {
 
                             startWritingMessage(attachment, byteBuffer);
                         }, workingPool);
+                        startListenSize(channel);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

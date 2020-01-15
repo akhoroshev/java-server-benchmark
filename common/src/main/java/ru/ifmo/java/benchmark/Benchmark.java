@@ -4,7 +4,10 @@ import org.apache.commons.lang3.tuple.Triple;
 import ru.ifmo.java.benchmark.client.Client;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.OptionalDouble;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -21,6 +24,19 @@ public class Benchmark {
     public Benchmark(String host, int port) {
         this.host = host;
         this.port = port;
+    }
+
+    public void warmUp() throws IOException {
+        Client client = new Client(host, port);
+        ArrayList<Integer> items = getItems(2000);
+        Collections.shuffle(items);
+
+        client.sortArray(items).thenRun(() -> {
+            try {
+                client.close();
+            } catch (IOException ignored) {
+            }
+        }).join();
     }
 
     public List<Point> evaluate(int requestCount, List<Integer> elementCounts, List<Integer> concurrencyClientCounts, List<Integer> timeIntervalsMs) throws IOException {
@@ -62,6 +78,15 @@ public class Benchmark {
                         return Triple.of(result.getLeft(), result.getMiddle(), System.nanoTime());
                     }));
                 }
+
+                task = task.thenApply(listLongLongTriple -> {
+                    try {
+                        client.close();
+                    } catch (IOException ignored) {
+                    }
+                    return listLongLongTriple;
+                });
+
                 tasks.add(task);
             }
 
@@ -92,7 +117,6 @@ public class Benchmark {
         final public int elements;
         final public int clients;
         final public int interval;
-
         final public double requestProcessTime;
         final public double clientProcessTime;
         final public double avgClientWaitingTime;
@@ -108,6 +132,18 @@ public class Benchmark {
 
         static public Point of(int elements, int clients, int interval, double requestProcessTime, double clientProcessTime, double avgClientWaitingTime) {
             return new Point(elements, clients, interval, requestProcessTime, clientProcessTime, avgClientWaitingTime);
+        }
+
+        public double getRequestProcessTime() {
+            return requestProcessTime;
+        }
+
+        public double getClientProcessTime() {
+            return clientProcessTime;
+        }
+
+        public double getAvgClientWaitingTime() {
+            return avgClientWaitingTime;
         }
     }
 

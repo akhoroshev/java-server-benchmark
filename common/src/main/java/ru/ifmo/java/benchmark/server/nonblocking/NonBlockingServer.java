@@ -30,7 +30,7 @@ public class NonBlockingServer extends Server {
     Lock outputSelectorLock = new ReentrantLock();
 
     public NonBlockingServer(String serverHost, int serverPort, int threads) throws IOException {
-        super(serverHost, serverPort);
+        super(ServerType.NON_BLOCKING, serverHost, serverPort);
         serverSocketChannel = ServerSocketChannel.open().bind(new InetSocketAddress(serverHost, serverPort));
         workingPool = Executors.newFixedThreadPool(threads);
     }
@@ -98,7 +98,9 @@ public class NonBlockingServer extends Server {
                     ChannelInputContext context = (ChannelInputContext) key.attachment();
 
                     if (key.isReadable()) {
-                        channel.read(context.buffer);
+                        if (channel.read(context.buffer) == -1) {
+                            key.cancel();
+                        }
                     }
 
                     if (!context.buffer.hasRemaining()) {

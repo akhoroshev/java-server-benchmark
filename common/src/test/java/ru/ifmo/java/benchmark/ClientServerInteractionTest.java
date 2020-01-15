@@ -6,13 +6,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import ru.ifmo.java.benchmark.client.Client;
 import ru.ifmo.java.benchmark.server.Server;
-import ru.ifmo.java.benchmark.server.async.AsyncServer;
-import ru.ifmo.java.benchmark.server.blocking.BlockingServer;
-import ru.ifmo.java.benchmark.server.blocking.NaiveBlockingServer;
-import ru.ifmo.java.benchmark.server.nonblocking.NonBlockingServer;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -21,15 +16,15 @@ public class ClientServerInteractionTest {
     final static int PORT = 12345;
     final static String HOST = "127.0.0.1";
     final static Random random = new Random();
-    final Class<? extends Server> clazz;
+    final Server.ServerType serverType;
 
-    public ClientServerInteractionTest(Class<? extends Server> clazz) {
-        this.clazz = clazz;
+    public ClientServerInteractionTest(Server.ServerType serverType) {
+        this.serverType = serverType;
     }
 
     @Parameterized.Parameters
-    public static Collection<Class<? extends Server>> data() {
-        return Arrays.asList(AsyncServer.class, BlockingServer.class, NaiveBlockingServer.class, NonBlockingServer.class);
+    public static Collection<Server.ServerType> data() {
+        return EnumSet.allOf(Server.ServerType.class);
     }
 
     static private List<Integer> makeRandomArray(int length) {
@@ -42,12 +37,8 @@ public class ClientServerInteractionTest {
         return arrayList;
     }
 
-    private Server makeServer() {
-        try {
-            return clazz.getConstructor(String.class, int.class).newInstance(ClientServerInteractionTest.HOST, ClientServerInteractionTest.PORT);
-        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+    private Server makeServer() throws IOException {
+        return Server.create(HOST, PORT, serverType);
     }
 
     private Client makeClient() throws IOException {
