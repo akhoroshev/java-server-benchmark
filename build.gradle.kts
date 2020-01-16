@@ -29,4 +29,8 @@ subprojects {
     configure<JavaPluginConvention> {
         sourceCompatibility = JavaVersion.VERSION_1_8
     }
+
+    tasks.withType<JavaExec>().configureEach {
+        jvmArgs("-Xmx4g")
+    }
 }

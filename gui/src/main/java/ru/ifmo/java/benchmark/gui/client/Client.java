@@ -11,10 +11,15 @@ import ru.ifmo.java.benchmark.server.Server;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -25,6 +30,7 @@ import static ru.ifmo.java.benchmark.Benchmark.*;
 
 public class Client {
     private final ExecutorService uiThreadPool = Executors.newSingleThreadExecutor();
+    private final ExecutorService benchmarkThreadPool = Executors.newSingleThreadExecutor();
     private String hostAddress;
     private int naiveBlockingPort;
     private int blockingPort;
@@ -89,17 +95,16 @@ public class Client {
             benchProp.add(createInputNumberField("Array size", () -> valueN, in -> valueN = in));
             benchProp.add(createInputNumberField("Client count", () -> valueM, in -> valueM = in));
             benchProp.add(createInputNumberField("Request count", () -> requestCount, in -> requestCount = in));
-            benchProp.add(createRunBenchButton(() -> {
+            benchProp.add(createRunBenchButton(() -> CompletableFuture.supplyAsync(() -> {
                 try {
-                    resultsPanel.add(runBench());
-                    resultsPanel.updateUI();
-                    JScrollBar vertical = scrollPane.getVerticalScrollBar();
-                    vertical.setValue( vertical.getMaximum() );
-                } catch (Throwable e) {
-                    e.printStackTrace();
+                    return runBench();
+                } catch (IOException e) {
+                    throw new CompletionException(e);
                 }
-
-            }));
+            }, benchmarkThreadPool).thenAcceptAsync(jPanel -> {
+                resultsPanel.add(jPanel);
+                resultsPanel.updateUI();
+            }, uiThreadPool)));
 
             mainFrame.add(benchProp, BorderLayout.SOUTH);
             mainFrame.setVisible(true);
@@ -182,7 +187,7 @@ public class Client {
 
         XYSeriesCollection collection = new XYSeriesCollection(series);
 
-        return new ChartPanel(ChartFactory.createXYLineChart(
+        return new ChartPanel(ChartFactory.createScatterPlot(
                 name,
                 changeParameter.toString(),
                 "time, ms",
@@ -192,6 +197,29 @@ public class Client {
                 true,
                 false
         ));
+    }
+
+    private JButton createSaveResultsButton(List<Benchmark.Point> points) {
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(e -> runInUiThread(() -> {
+            final JFileChooser SaveAs = new JFileChooser();
+            SaveAs.setApproveButtonText("Save");
+            int actionDialog = SaveAs.showOpenDialog(null);
+            if (actionDialog != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
+
+            try (BufferedWriter outFile = new BufferedWriter(new FileWriter(new File(SaveAs.getSelectedFile() + ".csv")))) {
+                String file = points.stream()
+                        .map(p -> String.format("%d,%d,%d,%f,%f,%f", p.clients, p.elements, p.interval, p.requestProcessTime, p.clientProcessTime, p.avgClientWaitingTime))
+                        .collect(Collectors.joining("\n", "clients,elements,interval,requestProcessTime,clientProcessTime,responseTime\n", ""));
+                outFile.write(file);
+            } catch (IOException err) {
+                JOptionPane.showMessageDialog(null, err.getMessage());
+            }
+        }));
+
+        return saveButton;
     }
 
     private JPanel runBench() throws IOException {
@@ -233,7 +261,7 @@ public class Client {
                 evaluate.stream().map(Benchmark.Point::getClientProcessTime).collect(Collectors.toList()));
 
         ChartPanel clientAvgResponseTimeDataChart = createChart(
-                "Client average wait time",
+                "Server response time",
                 range.stream().map(Double::new).collect(Collectors.toList()),
                 evaluate.stream().map(Benchmark.Point::getAvgClientWaitingTime).collect(Collectors.toList()));
 
@@ -241,10 +269,13 @@ public class Client {
         combined.setPreferredSize(new Dimension(800, 800));
 
         JLabel label = new JLabel(benchInfo.toString(), SwingConstants.CENTER);
-        label.setBackground(Color.white);
-        label.setOpaque(true);
         label.setFont(new Font("", Font.PLAIN, 20));
-        combined.add(label);
+
+        JPanel infoPanel = new JPanel();
+        infoPanel.add(label);
+        infoPanel.add(createSaveResultsButton(evaluate));
+
+        combined.add(infoPanel);
         combined.add(requestProcessTimeOnServerDataChart);
         combined.add(clientProcessTimeOnServerChart);
         combined.add(clientAvgResponseTimeDataChart);
