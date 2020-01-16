@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/akhoroshev/java-server-benchmark.svg?branch=master)](https://travis-ci.org/akhoroshev/java-server-benchmark)
+
 # Server Benchmark
 
 ## Сервер
