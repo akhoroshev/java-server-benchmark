@@ -4,11 +4,12 @@ import org.apache.commons.lang3.tuple.Triple;
 import ru.ifmo.java.benchmark.client.Client;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.OptionalDouble;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Benchmark {
@@ -17,7 +18,7 @@ public class Benchmark {
     public static final int DEFAULT_BLOCKING_PORT = 12346;
     public static final int DEFAULT_ASYNC_PORT = 12347;
     public static final int DEFAULT_NON_BLOCKING_PORT = 12348;
-
+    protected final Logger logger = Logger.getLogger(Benchmark.class.getName());
     final private String host;
     final private int port;
 
@@ -59,24 +60,53 @@ public class Benchmark {
 
             List<CompletableFuture<Triple<List<TimeSpent>, Long, Long>>> tasks = new ArrayList<>();
 
-            for (Client client : clients) {
-                CompletableFuture<Triple<List<TimeSpent>, Long, Long>> task = CompletableFuture.completedFuture(System.nanoTime())
-                        .thenCompose(startTime -> client.sortArray(items)
-                                .thenApply(response -> new ArrayList<>(Collections.singletonList(TimeSpent.from(response))))
-                                .thenApply(timeSpents -> Triple.of(timeSpents, startTime, System.nanoTime())));
+            final AtomicBoolean firstFinished = new AtomicBoolean(false);
+            final AtomicInteger countOfStartedClient = new AtomicInteger(0);
 
-                for (int j = 1; j < requestCount; j++) {
+            for (Client client : clients) {
+                CompletableFuture<Triple<List<TimeSpent>, Long, Long>> task = CompletableFuture.completedFuture(Triple.of(new ArrayList<>(), -1L, -1L));
+
+                for (int j = 0; j < requestCount; j++) {
+                    final int currentRequest = j;
                     task = task.thenApply(result ->
                     {
                         try {
-                            Thread.sleep(currentTimeIntervalMs);
+                            if (currentRequest != 0)
+                                Thread.sleep(currentTimeIntervalMs);
                         } catch (InterruptedException ignored) {
                         }
                         return result;
-                    }).thenCompose(result -> client.sortArray(items).thenApply(listResponse -> {
-                        result.getLeft().add(TimeSpent.from(listResponse));
-                        return Triple.of(result.getLeft(), result.getMiddle(), System.nanoTime());
-                    }));
+                    }).thenCompose(result -> {
+                        // Some client receives all responses
+                        if (firstFinished.get()) {
+                            return CompletableFuture.completedFuture(result);
+                        }
+
+                        final long maybeStartPoint = System.nanoTime();
+
+                        return client.sortArray(items).thenApply(listResponse -> {
+                            if (currentRequest == 0) {
+                                countOfStartedClient.incrementAndGet();
+                            }
+                            if (currentRequest == requestCount - 1) {
+                                firstFinished.set(true);
+                            }
+
+                            long startPoint = result.getMiddle();
+
+                            if (startPoint == -1 && countOfStartedClient.get() == currentConcurrencyClient) {
+                                startPoint = maybeStartPoint;
+                            }
+
+                            if (startPoint == -1) {
+                                // All clients not starts yet
+                                return result;
+                            }
+
+                            result.getLeft().add(TimeSpent.from(listResponse));
+                            return Triple.of(result.getLeft(), startPoint, System.nanoTime());
+                        });
+                    });
                 }
 
                 task = task.thenApply(listLongLongTriple -> {
@@ -91,12 +121,17 @@ public class Benchmark {
             }
 
             List<Triple<List<TimeSpent>, Long, Long>> triples = tasks.stream().map(CompletableFuture::join).collect(Collectors.toList());
+            Optional<Triple<List<TimeSpent>, Long, Long>> incorrect = triples.stream().filter(t -> t.getMiddle() == -1 && t.getRight() == -1).findFirst();
+
+            if (incorrect.isPresent()) {
+                logger.log(Level.WARNING, "Incorrect result, skip point");
+                continue;
+            }
 
             OptionalDouble averageProcessTimeClient = triples.stream().map(Triple::getLeft).flatMap(List::stream).map(TimeSpent::getProcessTimeClient).mapToDouble(value -> value).average();
             OptionalDouble averageProcessTimeRequest = triples.stream().map(Triple::getLeft).flatMap(List::stream).map(TimeSpent::getProcessTimeRequest).mapToDouble(value -> value).average();
-            OptionalDouble averageTimeOnClientSide = triples.stream().map(listLongLongTriple -> listLongLongTriple.getRight() - listLongLongTriple.getMiddle())
-                    .map(value -> value / 1000000.f - (requestCount - 1) * currentTimeIntervalMs)
-                    .map(aFloat -> aFloat / requestCount)
+            OptionalDouble averageTimeOnClientSide = triples.stream().map(
+                    t -> ((t.getRight() - t.getMiddle()) / 1000000.f - (t.getLeft().size() - 1) * currentTimeIntervalMs) / t.getLeft().size())
                     .mapToDouble(value -> value).average();
 
             results.add(Point.of(currentElementCount, currentConcurrencyClient, currentTimeIntervalMs, averageProcessTimeRequest.orElse(-1), averageProcessTimeClient.orElse(-1), averageTimeOnClientSide.orElse(-1)));

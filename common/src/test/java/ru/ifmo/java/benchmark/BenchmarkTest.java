@@ -39,7 +39,13 @@ public class BenchmarkTest {
 
         Benchmark benchmark = new Benchmark(HOST, PORT);
 
-        List<Benchmark.Point> evaluate = benchmark.evaluate(10, Arrays.asList(100, 200, 300, 400, 500), Arrays.asList(10, 10, 10, 10, 10), Arrays.asList(10, 10, 10, 10, 10));
+        List<Benchmark.Point> evaluate = benchmark.evaluate(20, Arrays.asList(100, 200, 300, 400, 500), Arrays.asList(10, 10, 10, 10, 10), Arrays.asList(10, 10, 10, 10, 10));
+
+        evaluate.forEach(point -> {
+            Assert.assertTrue(point.avgClientWaitingTime > 0);
+            Assert.assertTrue(point.clientProcessTime > 0);
+            Assert.assertTrue(point.requestProcessTime > 0);
+        });
 
         Assert.assertEquals(5, evaluate.size());
 
