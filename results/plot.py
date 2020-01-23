@@ -15,7 +15,7 @@ def plot(data_path: str, x_axis: str, y_axis: str):
     plts = list()
     for filename in find_csv_filenames(data_path):
         data = pd.read_csv(filename)
-        plts.append(plt.plot(data[x_axis], data[y_axis], "s", label=Path(filename).stem)[0])
+        plts.append(plt.plot(data[x_axis], data[y_axis], label=Path(filename).stem)[0])
     plt.legend(handles=plts)
     plt.xlabel(x_axis)
     plt.ylabel(y_axis)

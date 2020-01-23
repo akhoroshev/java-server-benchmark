@@ -24,11 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import static ru.ifmo.java.benchmark.Benchmark.*;
 
 public class Client {
+    protected final Logger logger = Logger.getLogger(Client.class.getName());
     private final ExecutorService uiThreadPool = Executors.newSingleThreadExecutor();
     private final ExecutorService benchmarkThreadPool = Executors.newSingleThreadExecutor();
     private String hostAddress;
@@ -99,6 +102,7 @@ public class Client {
                 try {
                     return runBench();
                 } catch (IOException e) {
+                    logger.log(Level.WARNING, e.getMessage());
                     throw new CompletionException(e);
                 }
             }, benchmarkThreadPool).thenAcceptAsync(jPanel -> {
@@ -238,14 +242,17 @@ public class Client {
         switch (changeParameter) {
             case N:
                 evaluate = benchmark.evaluate(requestCount, range, values(valueM, range.size()), values(valueDELTA, range.size()));
+                range = evaluate.stream().map(point -> point.elements).collect(Collectors.toList());
                 benchInfo.append("Client count: ").append(valueM).append("<br>").append("Delta: ").append(valueDELTA).append("<br>");
                 break;
             case M:
                 evaluate = benchmark.evaluate(requestCount, values(valueN, range.size()), range, values(valueDELTA, range.size()));
+                range = evaluate.stream().map(point -> point.clients).collect(Collectors.toList());
                 benchInfo.append("Array size: ").append(valueN).append("<br>").append("Delta: ").append(valueDELTA).append("<br>");
                 break;
             case DELTA:
                 evaluate = benchmark.evaluate(requestCount, values(valueN, range.size()), values(valueM, range.size()), range);
+                range = evaluate.stream().map(point -> point.interval).collect(Collectors.toList());
                 benchInfo.append("Array size: ").append(valueN).append("<br>").append("Client count: ").append(valueM).append("<br>");
                 break;
         }
